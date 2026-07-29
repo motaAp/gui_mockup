@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STAVIX ONU Wi-Fi 6 - Web GUI</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            light: '#e0f2fe',   // Azul suave para fundos de badges
+                            DEFAULT: '#0082d6', // Azul vibrante extraído do novo logo STAVIX
+                            dark: '#0062a8',    // Azul escuro para botões e contrastes
+                            header: '#0082d6'   // Tom do cabeçalho alinhado ao logo
+                        },
+                        navHighlight: '#ffb800' // Amarelo de destaque do menu ativo
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .sidebar-item.active {
+            background-color: #ffb800;
+            color: #1f2937;
+            font-weight: 700;
+        }
+        .content-page { display: none; }
+        .content-page.active { display: block; }
+        .wizard-step { display: none; }
+        .wizard-step.active { display: block; }
+
+        /* Estilo para as Sub-Abas da Rede e do Sistema */
+        .net-tab-btn.active, .sys-tab-btn.active {
+            background-color: #0062a8;
+            color: #ffffff;
+            font-weight: 700;
+        }
+        .net-tab-content, .sys-tab-content { display: none; }
+        .net-tab-content.active, .sys-tab-content.active { display: block; }
+    </style>
+</head>
+<body class="bg-slate-100 font-sans antialiased text-gray-800 flex flex-col min-h-screen">
+
+    <!-- ========================================== -->
+    <!-- 0. TELA DE LOGIN                           -->
+    <!-- ========================================== -->
+    <div id="login-screen" class="fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
+            <div class="bg-brand-header p-6 text-center text-white relative">
+                <div class="bg-white p-2 rounded-xl shadow-md inline-block mb-3">
+                    <img src="unnamed.webp" alt="STAVIX Logo" class="w-12 h-12 object-contain mx-auto" onerror="this.src='https://via.placeholder.com/48/0082d6/ffffff?text=SX'">
+                </div>
+                <h2 class="text-2xl font-bold tracking-wider">STAVIX</h2>
+                <p class="text-xs text-blue-100 mt-1" data-i18n="login_subtitle">GPON ONU Wi-Fi 6 - Painel de Controle</p>
+            </div>
+
+            <form id="login-form" onsubmit="handleLogin(event)" class="p-6 space-y-4">
+                <div id="login-error" class="hidden p-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-lg text-xs font-bold text-center">
+                    <span data-i18n="login_error_msg">Usuário ou senha incorretos!</span>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_username">Usuário</label>
+                    <input type="text" id="login-username" required placeholder="admin ou root" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_password">Senha</label>
+                    <input type="password" id="login-password" required placeholder="••••••••" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                </div>
+
+                <button type="submit" class="w-full bg-brand-dark text-white font-bold py-2.5 rounded-lg text-sm hover:bg-blue-800 transition-colors shadow-md" data-i18n="btn_login">
+                    Entrar no Sistema
+                </button>
+
+                <div class="pt-3 border-t border-slate-100 text-[11px] text-gray-400 space-y-1">
+                    <p class="font-bold text-gray-500" data-i18n="test_credentials_title">Credenciais de Teste:</p>
+                    <p>• Básico: <code class="bg-slate-100 px-1 py-0.5 rounded text-gray-700">admin / admin</code></p>
+                    <p>• Avançado: <code class="bg-slate-100 px-1 py-0.5 rounded text-gray-700">root / root</code></p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 1. CABEÇALHO SUPERIOR (HEADER AZUL)        -->
+    <!-- ========================================== -->
+    <header class="bg-brand-header text-white px-6 py-3 shadow-md flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="bg-white p-1.5 rounded-xl shadow-sm">
+                <img src="unnamed.webp" alt="STAVIX Logo" class="w-8 h-8 object-contain" onerror="this.src='https://via.placeholder.com/32/0082d6/ffffff?text=SX'">
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-wider leading-none">STAVIX</h1>
+                <span class="text-xs text-blue-100 font-medium" data-i18n="header_subtitle">Wi-Fi 6 GPON ONU - Matrix AX3000</span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3 text-xs font-medium">
+            <span id="user-badge" class="bg-white/20 text-white border border-white/30 px-3 py-1 rounded-lg font-bold">admin (Básico)</span>
+
+            <button id="btn-lang" onclick="toggleLanguage()" class="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white border border-white/30 px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm">
+                <svg class="w-4 h-4 text-blue-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1 4h6m-3 0v11m-8 0a7 7 0 0113.882-2.1M13 18l1.35 1.35c.4.4 1.05.4 1.45 0L19 16.5"></path></svg>
+                <span id="lang-text">PT / EN</span>
+            </button>
+
+            <button onclick="handleLogout()" class="flex items-center gap-1 bg-rose-500/80 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg font-bold transition-colors shadow-sm" title="Sair da Sessão">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                <span class="hidden md:inline" data-i18n="btn_logout">Sair</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ========================================== -->
+    <!-- 2. ESTRUTURA PRINCIPAL (SIDEBAR + PAINEL)  -->
+    <!-- ========================================== -->
+    <div class="flex flex-1">
+        <!-- Sidebar / Menu Lateral -->
+        <aside class="w-60 bg-white border-r border-slate-200 p-3 space-y-1">
+            <a href="#" class="sidebar-item active flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all" data-page="status">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <span data-i18n="nav_status">Status Geral</span>
+            </a>
+
+            <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-slate-100 transition-all" data-page="quick-setup">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                <span data-i18n="nav_quick_setup">Configuração Rápida</span>
+            </a>
+
+            <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-slate-100 transition-all" data-page="wifi6">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.193a11 11 0 0115.556 0"></path></svg>
+                <span data-i18n="nav_wifi6">Wi-Fi 6 (AX)</span>
+            </a>
+
+            <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-slate-100 transition-all" data-page="network" data-role="advanced">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
+                <span data-i18n="nav_network">Rede WAN / LAN</span>
+            </a>
+
+            <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-slate-100 transition-all" data-page="voip" data-role="advanced">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-3C9.716 21 3 14.284 3 6V5z"></path></svg>
+                <span data-i18n="nav_voip">Telefonia VoIP</span>
+            </a>
+
+            <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-slate-100 transition-all" data-page="security" data-role="advanced">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                <span data-i18n="nav_security">Segurança / Firewall</span>
+            </a>
+
+            <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-slate-100 transition-all" data-page="system" data-role="advanced">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
+                <span data-i18n="nav_system">Ferramentas Sistema</span>
+            </a>
+        </aside>
+
+        <!-- Área de Conteúdo das Páginas -->
+        <main class="flex-1 p-6 space-y-6">
+
+            <!-- PÁGINA 1: DASHBOARD / STATUS GERAL -->
+            <div id="page-status" class="content-page active space-y-6">
+                <!-- Informações do Dispositivo -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-5 h-5 text-brand-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>
+                            <h3 class="font-bold text-gray-700 text-sm" data-i18n="card_device_info">Informações do Dispositivo</h3>
+                        </div>
+                        <span class="text-xs bg-brand-light text-brand-dark px-2.5 py-0.5 rounded-full font-semibold">STAVIX ONU</span>
+                    </div>
+
+                    <div class="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                        <div>
+                            <p class="text-gray-400 font-medium" data-i18n="label_equipment_model">Equipment Model</p>
+                            <p class="text-sm font-bold text-gray-800 mt-1">H2-2</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 font-medium" data-i18n="label_equipment_id">Equipment Identification Number</p>
+                            <p class="text-sm font-mono font-bold text-gray-800 mt-1">666666-XPONQ2025102702</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 font-medium" data-i18n="label_hardware_ver">Hardware Version</p>
+                            <p class="text-sm font-mono font-bold text-gray-800 mt-1">HWVer-B001</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 font-medium" data-i18n="label_software_ver">Software Version</p>
+                            <p class="text-sm font-mono font-bold text-gray-800 mt-1">V1.0.0_STVX_2026</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Desempenho do Sistema e Conexão -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-brand-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                            <h3 class="font-bold text-gray-700 text-sm" data-i18n="card_sys_perf">Desempenho do Sistema</h3>
+                        </div>
+                        <div class="p-5 space-y-4 text-sm">
+                            <div>
+                                <span class="text-gray-500 font-medium" data-i18n="label_uptime">Tempo de Atividade:</span>
+                                <span class="text-gray-800 font-semibold ml-2">2 <span data-i18n="unit_days">dias</span>, 14:22:05</span>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-600 font-medium" data-i18n="label_cpu_usage">Uso de CPU</span>
+                                    <span class="text-brand-dark font-bold">12%</span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-2.5">
+                                    <div class="bg-brand-dark h-2.5 rounded-full" style="width: 12%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-600 font-medium" data-i18n="label_ram_usage">Uso de Memória RAM</span>
+                                    <span class="text-brand-dark font-bold">45%</span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-2.5">
+                                    <div class="bg-brand h-2.5 rounded-full" style="width: 45%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-5 h-5 text-brand-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                                <h3 class="font-bold text-gray-700 text-sm" data-i18n="card_conn_info">Informações de Conexão</h3>
+                            </div>
+                            <span class="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full font-semibold" data-i18n="status_connected">Conectado</span>
+                        </div>
+                        <div class="p-5 grid grid-cols-2 gap-4 text-xs">
+                            <div>
+                                <p class="text-gray-400" data-i18n="label_lan_mac">Endereço MAC LAN</p>
+                                <p class="font-mono text-gray-800 font-semibold mt-0.5">A4:91:B1:2C:4D:01</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400" data-i18n="label_lan_ip">Endereço IP LAN</p>
+                                <p class="font-mono text-gray-800 font-semibold mt-0.5">192.168.1.1</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400" data-i18n="label_wan_ip">IP WAN (PPPoE)</p>
+                                <p class="font-mono text-gray-800 font-semibold mt-0.5">187.56.201.89</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400" data-i18n="label_dns">Servidor DNS</p>
+                                <p class="font-mono text-gray-800 font-semibold mt-0.5">1.1.1.1 / 8.8.8.8</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Módulo Óptico GPON -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+                        <h3 class="font-bold text-gray-700 text-sm flex items-center gap-2">
+                            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            <span data-i18n="card_pon">Módulo Óptico GPON (PON Status)</span>
+                        </h3>
+                        <span class="text-xs bg-brand-light text-brand-dark px-3 py-1 rounded-full font-bold" data-i18n="status_o5">Estado O5 (Operacional)</span>
+                    </div>
+                    <div class="p-5 grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+                        <div>
+                            <p class="text-gray-400 text-xs" data-i18n="label_rx_power">Potência Rx (Recepção)</p>
+                            <p class="text-lg font-bold text-emerald-600">-19.45 dBm</p>
+                            <span class="text-[10px] text-gray-400" data-i18n="rx_ideal">Ideal: -8 a -27 dBm</span>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-xs" data-i18n="label_tx_power">Potência Tx (Transmissão)</p>
+                            <p class="text-lg font-bold text-gray-800">+2.15 dBm</p>
+                            <span class="text-[10px] text-gray-400" data-i18n="tx_ideal">Ideal: +0.5 a +5 dBm</span>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-xs" data-i18n="label_temp">Temperatura do Módulo</p>
+                            <p class="text-lg font-bold text-gray-800">41.2 °C</p>
+                            <span class="text-[10px] text-emerald-600" data-i18n="temp_normal">Normal (&lt; 70°C)</span>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-xs" data-i18n="label_gpon_sn">GPON Serial Number</p>
+                            <p class="text-sm font-mono font-bold text-gray-800 mt-1">STVX12345678</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recursos Avançados Wi-Fi 6 -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="bg-slate-50 px-5 py-3 border-b border-slate-200">
+                        <h3 class="font-bold text-gray-700 text-sm" data-i18n="card_wifi6_features">Recursos Avançados Wi-Fi 6 (802.11ax)</h3>
+                    </div>
+                    <div class="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
+                            <div>
+                                <p class="font-bold text-gray-800" data-i18n="wifi6_ofdma">OFDMA Multi-usuário</p>
+                                <p class="text-gray-500 text-[11px]" data-i18n="wifi6_ofdma_desc">Reduz latência em múltiplos dispositivos</p>
+                            </div>
+                            <span class="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded" data-i18n="badge_active">Ativo</span>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
+                            <div>
+                                <p class="font-bold text-gray-800" data-i18n="wifi6_bss">BSS Coloring</p>
+                                <p class="text-gray-500 text-[11px]" data-i18n="wifi6_bss_desc">Evita interferências de redes vizinhas</p>
+                            </div>
+                            <span class="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded" data-i18n="badge_color">Cor #4</span>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
+                            <div>
+                                <p class="font-bold text-gray-800" data-i18n="wifi6_bw">Largura de Banda 160MHz</p>
+                                <p class="text-gray-500 text-[11px]" data-i18n="wifi6_bw_desc">Velocidade máxima em 5GHz</p>
+                            </div>
+                            <span class="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded" data-i18n="badge_active">Ativo</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PÁGINA 2: QUICK SETUP -->
+            <div id="page-quick-setup" class="content-page space-y-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="mb-8 border-b border-slate-100 pb-6">
+                        <h2 class="text-xl font-bold text-gray-800" data-i18n="wizard_title">Assistente de Configuração Rápida</h2>
+                        <p class="text-xs text-gray-500 mt-1" data-i18n="wizard_subtitle">Siga os passos abaixo para configurar sua internet e rede sem fio em poucos minutos.</p>
+
+                        <div class="flex items-center justify-between max-w-xl mx-auto mt-6 text-xs font-bold">
+                            <div class="flex items-center gap-2 text-brand-dark" id="step-indicator-1">
+                                <span class="w-7 h-7 rounded-full bg-brand-light border-2 border-brand-dark flex items-center justify-center">1</span>
+                                <span data-i18n="step1_title">Fuso Horário</span>
+                            </div>
+                            <div class="h-0.5 w-12 bg-slate-200"></div>
+                            <div class="flex items-center gap-2 text-gray-400" id="step-indicator-2">
+                                <span class="w-7 h-7 rounded-full bg-slate-100 border-2 border-slate-300 flex items-center justify-center">2</span>
+                                <span data-i18n="step2_title">Internet WAN</span>
+                            </div>
+                            <div class="h-0.5 w-12 bg-slate-200"></div>
+                            <div class="flex items-center gap-2 text-gray-400" id="step-indicator-3">
+                                <span class="w-7 h-7 rounded-full bg-slate-100 border-2 border-slate-300 flex items-center justify-center">3</span>
+                                <span data-i18n="step3_title">Wi-Fi 6</span>
+                            </div>
+                            <div class="h-0.5 w-12 bg-slate-200"></div>
+                            <div class="flex items-center gap-2 text-gray-400" id="step-indicator-4">
+                                <span class="w-7 h-7 rounded-full bg-slate-100 border-2 border-slate-300 flex items-center justify-center">4</span>
+                                <span data-i18n="step4_title">Resumo</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASSO 1: FUSO HORÁRIO -->
+                    <div id="wizard-step-1" class="wizard-step active space-y-4 max-w-md mx-auto">
+                        <h3 class="font-bold text-gray-800 text-base" data-i18n="step1_header">Passo 1: Selecione o Fuso Horário</h3>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_timezone">Fuso Horário Local</label>
+                            <select id="qs-timezone" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                                <option value="GMT-03:00">(GMT-03:00) Brasília, São Paulo, Buenos Aires</option>
+                                <option value="GMT-04:00">(GMT-04:00) Manaus, Cuiabá</option>
+                                <option value="GMT-00:00">(GMT+00:00) Lisboa, Londres, UTC</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- PASSO 2: WAN -->
+                    <div id="wizard-step-2" class="wizard-step space-y-4 max-w-md mx-auto">
+                        <h3 class="font-bold text-gray-800 text-base" data-i18n="step2_header">Passo 2: Configuração da Internet (WAN)</h3>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_connection_type">Tipo de Conexão com o Provedor</label>
+                            <select id="qs-wan-type" onchange="toggleWanFields()" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                                <option value="pppoe">PPPoE (Recomendado para Fibra)</option>
+                                <option value="dhcp">IP Dinâmico (DHCP)</option>
+                                <option value="static">IP Estático</option>
+                                <option value="bridge">Modo Bridge</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_vlan_id">VLAN ID (Opcional/Provedor)</label>
+                            <input type="number" id="qs-vlan" value="100" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                        </div>
+
+                        <div id="pppoe-fields" class="space-y-3 pt-2">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_pppoe_user">Usuário PPPoE</label>
+                                <input type="text" id="qs-pppoe-user" value="cliente@provedor.com.br" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_pppoe_pass">Senha PPPoE</label>
+                                <input type="password" id="qs-pppoe-pass" value="senha123" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASSO 3: WI-FI -->
+                    <div id="wizard-step-3" class="wizard-step space-y-4 max-w-md mx-auto">
+                        <h3 class="font-bold text-gray-800 text-base" data-i18n="step3_header">Passo 3: Configuração da Rede Wi-Fi 6</h3>
+
+                        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <div>
+                                <p class="text-xs font-bold text-gray-800" data-i18n="label_smart_connect">Smart Connect (SSID Único)</p>
+                                <p class="text-[11px] text-gray-500" data-i18n="desc_smart_connect">Unifica 2.4GHz e 5GHz no mesmo nome de rede</p>
+                            </div>
+                            <input type="checkbox" id="qs-smart-connect" checked class="w-4 h-4 text-brand-dark rounded focus:ring-brand-dark">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_wifi_ssid">Nome da Rede Wi-Fi (SSID)</label>
+                            <input type="text" id="qs-wifi-ssid" value="STAVIX_Fibra_Wi-Fi6" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_wifi_pass">Senha do Wi-Fi (Mínimo 8 caracteres)</label>
+                            <input type="password" id="qs-wifi-pass" value="SenhaSegura123!" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- PASSO 4: RESUMO -->
+                    <div id="wizard-step-4" class="wizard-step space-y-4 max-w-md mx-auto">
+                        <h3 class="font-bold text-gray-800 text-base" data-i18n="step4_header">Passo 4: Confirmar Configurações</h3>
+                        <p class="text-xs text-gray-500" data-i18n="step4_desc">Revise os parâmetros abaixo antes de salvar e aplicar.</p>
+
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
+                            <div class="flex justify-between"><span class="text-gray-500" data-i18n="label_timezone">Fuso Horário:</span><span id="summary-tz" class="font-bold">GMT-03:00</span></div>
+                            <div class="flex justify-between"><span class="text-gray-500" data-i18n="label_connection_type">Tipo WAN:</span><span id="summary-wan" class="font-bold">PPPoE</span></div>
+                            <div class="flex justify-between"><span class="text-gray-500" data-i18n="label_vlan_id">VLAN ID:</span><span id="summary-vlan" class="font-bold">100</span></div>
+                            <div class="flex justify-between"><span class="text-gray-500" data-i18n="label_wifi_ssid">SSID Wi-Fi:</span><span id="summary-ssid" class="font-bold">STAVIX_Fibra_Wi-Fi6</span></div>
+                        </div>
+
+                        <div id="finish-message" class="hidden p-3 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold text-center" data-i18n="msg_saved_success">
+                            ✓ Configurações salvas e aplicadas com sucesso!
+                        </div>
+                    </div>
+
+                    <div class="mt-8 pt-4 border-t border-slate-100 flex justify-between max-w-md mx-auto">
+                        <button id="btn-prev" onclick="changeStep(-1)" class="px-5 py-2 rounded-lg border border-slate-300 text-sm font-bold text-gray-600 hover:bg-slate-50 transition-colors hidden" data-i18n="btn_prev">Anterior</button>
+                        <button id="btn-next" onclick="changeStep(1)" class="ml-auto bg-brand-dark text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-blue-800 transition-colors" data-i18n="btn_next">Próximo</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PÁGINA 3: WI-FI 6 CONFIG -->
+            <div id="page-wifi6" class="content-page space-y-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <h2 class="text-lg font-bold text-gray-800" data-i18n="wifi_setup_title">Configuração das Redes Sem Fio Wi-Fi 6</h2>
+                    <p class="text-xs text-gray-500" data-i18n="wifi_setup_desc">Configure o SSID unificado (Band Steering) ou ajuste as frequências individualmente.</p>
+                    <div class="space-y-4 pt-2">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_ssid">Nome da Rede Wi-Fi (SSID Unificado)</label>
+                            <input type="text" value="STAVIX_Fibra_Wi-Fi6" class="w-full md:w-1/2 border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_password">Senha WPA3 / WPA2 Personal</label>
+                            <input type="password" value="SenhaSegura123!" class="w-full md:w-1/2 border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                        </div>
+                        <button class="bg-brand-dark text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-blue-800 transition-colors" data-i18n="btn_save">Salvar Configurações</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PÁGINA 4: REDE WAN / LAN -->
+            <div id="page-network" class="content-page space-y-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-4 mb-6">
+                        <button class="net-tab-btn active px-4 py-2 rounded-lg text-xs transition-all" onclick="switchNetTab('net-internet')" data-i18n="net_sub_internet">Internet</button>
+                        <button class="net-tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchNetTab('net-lan')" data-i18n="net_sub_lan">LAN</button>
+                        <button class="net-tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchNetTab('net-iptv')" data-i18n="net_sub_iptv">IPTV</button>
+                        <button class="net-tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchNetTab('net-dhcp')" data-i18n="net_sub_dhcp">DHCP Server</button>
+                        <button class="net-tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchNetTab('net-ddns')" data-i18n="net_sub_ddns">Dynamic DNS</button>
+                        <button class="net-tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchNetTab('net-routing')" data-i18n="net_sub_routing">Static Routing</button>
+                    </div>
+
+                    <!-- SUB-ABA 1: INTERNET -->
+                    <div id="net-internet" class="net-tab-content active space-y-4 max-w-lg">
+                        <h3 class="font-bold text-gray-800 text-sm border-b pb-2" data-i18n="net_internet_title">Configuração da Interface WAN</h3>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_connection_type">Tipo de Conexão WAN</label>
+                            <select class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                                <option value="pppoe">PPPoE</option>
+                                <option value="dhcp">Dynamic IP (DHCP)</option>
+                                <option value="static">Static IP</option>
+                                <option value="bridge">Bridge Mode</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_vlan_enable">Modo VLAN</label>
+                                <select class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                                    <option value="tag">802.1Q Tag</option>
+                                    <option value="untag">Untagged</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_vlan_id">VLAN ID</label>
+                                <input type="number" value="100" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_pppoe_user">Usuário PPPoE</label>
+                            <input type="text" value="cliente@provedor.com.br" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_pppoe_pass">Senha PPPoE</label>
+                            <input type="password" value="senha123" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">MTU Size</label>
+                            <input type="number" value="1492" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                        </div>
+                        <button class="bg-brand-dark text-white px-5 py-2 rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors" data-i18n="btn_save">Salvar Alterações</button>
+                    </div>
+
+                    <!-- SUB-ABA 2: LAN -->
+                    <div id="net-lan" class="net-tab-content space-y-4 max-w-lg">
+                        <h3 class="font-bold text-gray-800 text-sm border-b pb-2" data-i18n="net_lan_title">Configuração da Rede Local (LAN)</h3>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_lan_ip">Endereço IP do Roteador</label>
+                            <input type="text" value="192.168.1.1" class="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_subnet_mask">Máscara de Sub-rede</label>
+                            <input type="text" value="255.255.255.0" class="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                        </div>
+                        <div class="flex items-center gap-2 pt-2">
+                            <input type="checkbox" id="ipv6-lan" checked class="w-4 h-4 text-brand-dark rounded">
+                            <label for="ipv6-lan" class="text-xs font-bold text-gray-700" data-i18n="label_ipv6_enable">Habilitar IPv6 RADVD / DHCPv6</label>
+                        </div>
+                        <button class="bg-brand-dark text-white px-5 py-2 rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors" data-i18n="btn_save">Salvar Alterações</button>
+                    </div>
+
+                    <!-- SUB-ABA 3: IPTV -->
+                    <div id="net-iptv" class="net-tab-content space-y-4 max-w-lg">
+                        <h3 class="font-bold text-gray-800 text-sm border-b pb-2" data-i18n="net_iptv_title">Serviço de IPTV & Multicast</h3>
+                        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <span class="text-xs font-bold text-gray-700" data-i18n="label_igmp_proxy">IGMP Proxy</span>
+                            <input type="checkbox" checked class="w-4 h-4 text-brand-dark rounded">
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <span class="text-xs font-bold text-gray-700" data-i18n="label_igmp_snooping">IGMP Snooping</span>
+                            <input type="checkbox" checked class="w-4 h-4 text-brand-dark rounded">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_iptv_vlan">IPTV VLAN ID</label>
+                            <input type="number" value="200" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                        </div>
+                        <button class="bg-brand-dark text-white px-5 py-2 rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors" data-i18n="btn_save">Salvar Alterações</button>
+                    </div>
+
+                    <!-- SUB-ABA 4: DHCP SERVER -->
+                    <div id="net-dhcp" class="net-tab-content space-y-4 max-w-lg">
+                        <h3 class="font-bold text-gray-800 text-sm border-b pb-2" data-i18n="net_dhcp_title">Servidor DHCP Local</h3>
+                        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <span class="text-xs font-bold text-gray-700" data-i18n="label_dhcp_server">Habilitar Servidor DHCP</span>
+                            <input type="checkbox" checked class="w-4 h-4 text-brand-dark rounded">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_start_ip">IP Inicial</label>
+                                <input type="text" value="192.168.1.100" class="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_end_ip">IP Final</label>
+                                <input type="text" value="192.168.1.250" class="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                            </div>
+                        </div>
+                        <button class="bg-brand-dark text-white px-5 py-2 rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors" data-i18n="btn_save">Salvar Alterações</button>
+                    </div>
+
+                    <!-- SUB-ABA 5: DDNS -->
+                    <div id="net-ddns" class="net-tab-content space-y-4 max-w-lg">
+                        <h3 class="font-bold text-gray-800 text-sm border-b pb-2" data-i18n="net_ddns_title">DNS Dinâmico (DDNS)</h3>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1" data-i18n="label_ddns_provider">Provedor do Serviço</label>
+                            <select class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                                <option value="noip">No-IP (www.noip.com)</option>
+                                <option value="dyndns">DynDNS (www.dyndns.com)</option>
+                            </select>
+                        </div>
+                        <button class="bg-brand-dark text-white px-5 py-2 rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors" data-i18n="btn_save">Salvar & Conectar</button>
+                    </div>
+
+                    <!-- SUB-ABA 6: STATIC ROUTING -->
+                    <div id="net-routing" class="net-tab-content space-y-4">
+                        <h3 class="font-bold text-gray-800 text-sm border-b pb-2" data-i18n="net_routing_title">Tabela de Roteamento Estático</h3>
+                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                            <div>
+                                <label class="block font-bold text-gray-700 mb-1">IP de Destino</label>
+                                <input type="text" placeholder="192.168.2.0" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block font-bold text-gray-700 mb-1">Máscara</label>
+                                <input type="text" placeholder="255.255.255.0" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block font-bold text-gray-700 mb-1">Gateway</label>
+                                <input type="text" placeholder="192.168.1.254" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-brand-dark focus:outline-none">
+                            </div>
+                            <div class="flex items-end">
+                                <button class="w-full bg-brand-dark text-white p-2 rounded-lg font-bold hover:bg-blue-800 transition-colors" data-i18n="btn_add_route">Adicionar Rota</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- PÁGINAS AUXILIARES -->
+            <div id="page-voip" class="content-page p-6 bg-white rounded-xl border border-slate-200"><h2 class="font-bold text-lg text-gray-800">Telefonia VoIP</h2></div>
+            <div id="page-security" class="content-page p-6 bg-white rounded-xl border border-slate-200"><h2 class="font-bold text-lg text-gray-800">Segurança e Firewall</h2></div>
+
+            <!-- SYSTEM TOOLS -->
+            <div id="page-system" class="content-page space-y-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-4 mb-6">
+                        <button class="sys-tab-btn px-3 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchSysTab('sys-time')" data-i18n="sys_sub_time">Time Settings</button>
+                        <button class="sys-tab-btn px-3 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchSysTab('sys-led')" data-i18n="sys_sub_led">LED Control</button>
+                        <button class="sys-tab-btn px-3 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchSysTab('sys-diag')" data-i18n="sys_sub_diag">Diagnostics</button>
+                        <button class="sys-tab-btn px-3 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchSysTab('sys-upgrade')" data-i18n="sys_sub_upgrade">Firmware Upgrade</button>
+                        <button class="sys-tab-btn active px-3 py-2 rounded-lg text-xs transition-all" onclick="switchSysTab('sys-backup')" data-i18n="sys_sub_backup">Backup & Restore</button>
+                        <button class="sys-tab-btn px-3 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchSysTab('sys-reboot')" data-i18n="sys_sub_reboot">Reboot Schedule</button>
+                        <button class="sys-tab-btn px-3 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchSysTab('sys-admin')" data-i18n="sys_sub_admin">Administration</button>
+                        <button class="sys-tab-btn px-3 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchSysTab('sys-log')" data-i18n="sys_sub_log">System Log</button>
+                        <button class="sys-tab-btn px-3 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchSysTab('sys-traffic')" data-i18n="sys_sub_traffic">Traffic Monitor</button>
+                        <button class="sys-tab-btn px-3 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-all" onclick="switchSysTab('sys-params')" data-i18n="sys_sub_params">System Parameters</button>
+                    </div>
+
+                    <!-- SUB-ABA BACKUP & RESTORE -->
+                    <div id="sys-backup" class="sys-tab-content active space-y-6 max-w-3xl">
+                        <div class="border border-slate-200 rounded-xl overflow-hidden">
+                            <div class="bg-slate-50 p-4 border-b border-slate-200 flex items-center gap-3">
+                                <svg class="w-5 h-5 text-brand-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                <div>
+                                    <h3 class="font-bold text-gray-800 text-sm" data-i18n="sys_backup_title">Backup Configuration</h3>
+                                    <p class="text-[11px] text-gray-500" data-i18n="sys_backup_desc">Guarde uma cópia das configurações atuais da sua ONU no seu computador.</p>
+                                </div>
+                            </div>
+                            <div class="p-4 bg-white flex items-center justify-between">
+                                <span class="text-xs text-gray-600 font-mono">config_stavix_2026.bin</span>
+                                <button onclick="triggerBackup()" class="bg-brand-dark text-white px-5 py-2 rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors flex items-center gap-2">
+                                    <span data-i18n="btn_backup">Fazer Backup</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="border border-slate-200 rounded-xl overflow-hidden">
+                            <div class="bg-slate-50 p-4 border-b border-slate-200 flex items-center gap-3">
+                                <svg class="w-5 h-5 text-brand-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                <div>
+                                    <h3 class="font-bold text-gray-800 text-sm" data-i18n="sys_restore_title">Restore Configuration</h3>
+                                    <p class="text-[11px] text-gray-500" data-i18n="sys_restore_desc">Restaure as configurações a partir de um ficheiro de backup salvo anteriormente.</p>
+                                </div>
+                            </div>
+                            <div class="p-4 bg-white flex flex-col sm:flex-row items-center gap-4">
+                                <input type="file" id="restore-file" accept=".bin,.cfg" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-brand-dark border border-slate-200 rounded-lg p-1 cursor-pointer">
+                                <button onclick="triggerRestore()" class="w-full sm:w-auto bg-amber-500 text-white px-5 py-2.5 rounded-lg text-xs font-bold hover:bg-amber-600 transition-colors whitespace-nowrap">
+                                    <span data-i18n="btn_restore">Restaurar Ficheiro</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="border border-rose-200 rounded-xl overflow-hidden shadow-sm">
+                            <div class="bg-rose-50 p-4 border-b border-rose-100 flex items-center gap-3">
+                                <div>
+                                    <h3 class="font-bold text-rose-700 text-sm" data-i18n="sys_factory_title">Factory Default (Reposição de Fábrica)</h3>
+                                    <p class="text-[11px] text-rose-500" data-i18n="sys_factory_desc">Atenção: Esta ação apagará todas as configurações e devolverá a ONU ao estado original.</p>
+                                </div>
+                            </div>
+                            <div class="p-4 bg-white text-right">
+                                <button onclick="triggerFactoryReset()" class="bg-rose-600 text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-rose-700 transition-colors">
+                                    <span data-i18n="btn_factory_reset">Repor Valores de Fábrica</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DEMAIS SUB-ABAS DE SYSTEM TOOLS -->
+                    <div id="sys-time" class="sys-tab-content space-y-4 max-w-md"><h3 class="font-bold text-gray-800 text-sm border-b pb-2">Time Settings</h3><input type="text" value="pool.ntp.org" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><button class="bg-brand-dark text-white px-5 py-2 rounded-lg text-xs font-bold">Apply</button></div>
+                    <div id="sys-led" class="sys-tab-content space-y-4"><h3 class="font-bold text-gray-800 text-sm border-b pb-2">LED Control</h3></div>
+                    <div id="sys-diag" class="sys-tab-content space-y-4"><h3 class="font-bold text-gray-800 text-sm border-b pb-2">Diagnostics</h3></div>
+                    <div id="sys-upgrade" class="sys-tab-content space-y-4 max-w-lg"><h3 class="font-bold text-gray-800 text-sm border-b pb-2">Firmware Upgrade</h3></div>
+                    <div id="sys-reboot" class="sys-tab-content"><h3 class="font-bold text-sm">Reboot Schedule</h3></div>
+                    <div id="sys-admin" class="sys-tab-content"><h3 class="font-bold text-sm">Administration</h3></div>
+                    <div id="sys-log" class="sys-tab-content"><h3 class="font-bold text-sm">System Log</h3></div>
+                    <div id="sys-traffic" class="sys-tab-content"><h3 class="font-bold text-sm">Traffic Monitor</h3></div>
+                    <div id="sys-params" class="sys-tab-content"><h3 class="font-bold text-sm">System Parameters</h3></div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- 3. RODAPÉ MINIMALISTA -->
+    <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-gray-400" data-i18n="footer_copyright">
+        &copy; 2026 STAVIX Technology. Todos os direitos reservados.
+    </footer>
+
+    <!-- ========================================== -->
+    <!-- 4. LÓGICA JAVASCRIPT CONSOLIDADA           -->
+    <!-- ========================================== -->
+    <script>
+        const translations = {
+            pt: {
+                login_subtitle: "GPON ONU Wi-Fi 6 - Painel de Controle",
+                login_error_msg: "Usuário ou senha incorretos!",
+                label_username: "Usuário",
+                label_password: "Senha",
+                btn_login: "Entrar no Sistema",
+                test_credentials_title: "Credenciais de Teste:",
+                header_subtitle: "Wi-Fi 6 GPON ONU - Matrix AX3000",
+                btn_logout: "Sair",
+                nav_status: "Status Geral",
+                nav_quick_setup: "Configuração Rápida",
+                nav_network: "Rede WAN / LAN",
+                nav_wifi6: "Wi-Fi 6 (AX)",
+                nav_voip: "Telefonia VoIP",
+                nav_security: "Segurança / Firewall",
+                nav_system: "Ferramentas Sistema",
+                card_device_info: "Informações do Dispositivo",
+                label_equipment_model: "Equipment Model",
+                label_equipment_id: "Equipment Identification Number",
+                label_hardware_ver: "Hardware Version",
+                label_software_ver: "Software Version",
+                card_sys_perf: "Desempenho do Sistema",
+                label_uptime: "Tempo de Atividade:",
+                unit_days: "dias",
+                label_cpu_usage: "Uso de CPU",
+                label_ram_usage: "Uso de Memória RAM",
+                card_conn_info: "Informações de Conexão",
+                status_connected: "Conectado",
+                label_lan_mac: "Endereço MAC LAN",
+                label_lan_ip: "Endereço IP LAN",
+                label_wan_ip: "IP WAN (PPPoE)",
+                label_dns: "Servidor DNS",
+                card_pon: "Módulo Óptico GPON (PON Status)",
+                status_o5: "Estado O5 (Operacional)",
+                label_rx_power: "Potência Rx (Recepção)",
+                rx_ideal: "Ideal: -8 a -27 dBm",
+                label_tx_power: "Potência Tx (Transmissão)",
+                tx_ideal: "Ideal: +0.5 a +5 dBm",
+                label_temp: "Temperatura do Módulo",
+                temp_normal: "Normal (< 70°C)",
+                label_gpon_sn: "GPON Serial Number",
+                card_wifi6_features: "Recursos Avançados Wi-Fi 6 (802.11ax)",
+                wifi6_ofdma: "OFDMA Multi-usuário",
+                wifi6_ofdma_desc: "Reduz latência em múltiplos dispositivos",
+                wifi6_bss: "BSS Coloring",
+                wifi6_bss_desc: "Evita interferências de redes vizinhas",
+                wifi6_bw: "Largura de Banda 160MHz",
+                wifi6_bw_desc: "Velocidade máxima em 5GHz",
+                badge_active: "Ativo",
+                badge_color: "Cor #4",
+                wizard_title: "Assistente de Configuração Rápida",
+                wizard_subtitle: "Siga os passos abaixo para configurar sua internet e rede sem fio em poucos minutos.",
+                step1_title: "Fuso Horário",
+                step2_title: "Internet WAN",
+                step3_title: "Wi-Fi 6",
+                step4_title: "Resumo",
+                step1_header: "Passo 1: Selecione o Fuso Horário",
+                label_timezone: "Fuso Horário Local",
+                step2_header: "Passo 2: Configuração da Internet (WAN)",
+                label_connection_type: "Tipo de Conexão com o Provedor",
+                label_vlan_id: "VLAN ID (Opcional/Provedor)",
+                label_pppoe_user: "Usuário PPPoE",
+                label_pppoe_pass: "Senha PPPoE",
+                step3_header: "Passo 3: Configuração da Rede Wi-Fi 6",
+                label_smart_connect: "Smart Connect (SSID Único)",
+                desc_smart_connect: "Unifica 2.4GHz e 5GHz no mesmo nome de rede",
+                label_wifi_ssid: "Nome da Rede Wi-Fi (SSID)",
+                label_wifi_pass: "Senha do Wi-Fi (Mínimo 8 caracteres)",
+                step4_header: "Passo 4: Confirmar Configurações",
+                step4_desc: "Revise os parâmetros abaixo antes de salvar e aplicar.",
+                msg_saved_success: "✓ Configurações salvas e aplicadas com sucesso!",
+                btn_prev: "Anterior",
+                btn_next: "Próximo",
+                btn_finish: "Salvar & Concluir",
+                wifi_setup_title: "Configuração das Redes Sem Fio Wi-Fi 6",
+                wifi_setup_desc: "Configure o SSID unificado (Band Steering) ou ajuste as frequências individualmente.",
+                label_ssid: "Nome da Rede Wi-Fi (SSID Unificado)",
+                label_password: "Senha WPA3 / WPA2 Personal",
+                btn_save: "Salvar Configurações",
+                net_sub_internet: "Internet",
+                net_sub_lan: "LAN",
+                net_sub_iptv: "IPTV",
+                net_sub_dhcp: "DHCP Server",
+                net_sub_ddns: "Dynamic DNS",
+                net_sub_routing: "Static Routing",
+                net_internet_title: "Configuração da Interface WAN",
+                label_vlan_enable: "Modo VLAN",
+                net_lan_title: "Configuração da Rede Local (LAN)",
+                label_subnet_mask: "Máscara de Sub-rede",
+                label_ipv6_enable: "Habilitar IPv6 RADVD / DHCPv6",
+                net_iptv_title: "Serviço de IPTV & Multicast",
+                label_igmp_proxy: "IGMP Proxy",
+                label_igmp_snooping: "IGMP Snooping",
+                label_iptv_vlan: "IPTV VLAN ID",
+                label_iptv_port: "Porta LAN Associada ao IPTV",
+                net_dhcp_title: "Servidor DHCP Local",
+                label_dhcp_server: "Habilitar Servidor DHCP",
+                label_start_ip: "IP Inicial",
+                label_end_ip: "IP Final",
+                label_lease_time: "Tempo de Concessão (minutos)",
+                net_ddns_title: "DNS Dinâmico (DDNS)",
+                label_ddns_provider: "Provedor do Serviço",
+                label_ddns_domain: "Nome do Domínio (Domain Name)",
+                net_routing_title: "Tabela de Roteamento Estático",
+                btn_add_route: "Adicionar Rota",
+                sys_sub_time: "Time Settings",
+                sys_sub_led: "LED Control",
+                sys_sub_diag: "Diagnostics",
+                sys_sub_upgrade: "Firmware Upgrade",
+                sys_sub_backup: "Backup & Restore",
+                sys_sub_reboot: "Reboot Schedule",
+                sys_sub_admin: "Administration",
+                sys_sub_log: "System Log",
+                sys_sub_traffic: "Traffic Monitor",
+                sys_sub_params: "System Parameters",
+                sys_backup_title: "Fazer Backup da Configuração",
+                sys_backup_desc: "Guarde uma cópia das configurações atuais da sua ONU no seu computador.",
+                btn_backup: "Fazer Backup",
+                sys_restore_title: "Restaurar Configuração",
+                sys_restore_desc: "Restaure as configurações a partir de um ficheiro de backup salvo anteriormente (.bin ou .cfg).",
+                btn_restore: "Carregar Ficheiro",
+                sys_factory_title: "Reposição de Fábrica (Factory Default)",
+                sys_factory_desc: "Atenção: Esta ação apagará todas as configurações e devolverá a ONU ao estado original de fábrica.",
+                btn_factory_reset: "Repor Valores de Fábrica",
+                footer_copyright: "© 2026 STAVIX Technology. Todos os direitos reservados."
+            },
+            en: {
+                login_subtitle: "GPON ONU Wi-Fi 6 - Control Panel",
+                login_error_msg: "Incorrect username or password!",
+                label_username: "Username",
+                label_password: "Password",
+                btn_login: "Login to System",
+                test_credentials_title: "Test Credentials:",
+                header_subtitle: "Wi-Fi 6 GPON ONU - Matrix AX3000",
+                btn_logout: "Logout",
+                nav_status: "General Status",
+                nav_quick_setup: "Quick Setup",
+                nav_network: "WAN / LAN Network",
+                nav_wifi6: "Wi-Fi 6 (AX)",
+                nav_voip: "VoIP Telephony",
+                nav_security: "Security / Firewall",
+                nav_system: "System Tools",
+                card_device_info: "Device Information",
+                label_equipment_model: "Equipment Model",
+                label_equipment_id: "Equipment Identification Number",
+                label_hardware_ver: "Hardware Version",
+                label_software_ver: "Software Version",
+                card_sys_perf: "System Performance",
+                label_uptime: "System Uptime:",
+                unit_days: "days",
+                label_cpu_usage: "CPU Usage",
+                label_ram_usage: "RAM Memory Usage",
+                card_conn_info: "Connection Information",
+                status_connected: "Connected",
+                label_lan_mac: "LAN MAC Address",
+                label_lan_ip: "LAN IP Address",
+                label_wan_ip: "WAN IP (PPPoE)",
+                label_dns: "DNS Server",
+                card_pon: "GPON Optical Module (PON Status)",
+                status_o5: "State O5 (Operational)",
+                label_rx_power: "Rx Power (Receive)",
+                rx_ideal: "Ideal: -8 to -27 dBm",
+                label_tx_power: "Tx Power (Transmit)",
+                tx_ideal: "Ideal: +0.5 to +5 dBm",
+                label_temp: "Module Temperature",
+                temp_normal: "Normal (< 70°C)",
+                label_gpon_sn: "GPON Serial Number",
+                card_wifi6_features: "Wi-Fi 6 Advanced Features (802.11ax)",
+                wifi6_ofdma: "Multi-user OFDMA",
+                wifi6_ofdma_desc: "Reduces latency across multiple devices",
+                wifi6_bss: "BSS Coloring",
+                wifi6_bss_desc: "Prevents interference from neighbor networks",
+                wifi6_bw: "160MHz Bandwidth",
+                wifi6_bw_desc: "Maximum speed on 5GHz",
+                badge_active: "Active",
+                badge_color: "Color #4",
+                wizard_title: "Quick Setup Wizard",
+                wizard_subtitle: "Follow the steps below to configure your internet and wireless network in a few minutes.",
+                step1_title: "Time Zone",
+                step2_title: "Internet WAN",
+                step3_title: "Wi-Fi 6",
+                step4_title: "Summary",
+                step1_header: "Step 1: Select Time Zone",
+                label_timezone: "Local Time Zone",
+                step2_header: "Step 2: Internet Connection (WAN)",
+                label_connection_type: "ISP Connection Type",
+                label_vlan_id: "VLAN ID (Optional/ISP)",
+                label_pppoe_user: "PPPoE Username",
+                label_pppoe_pass: "PPPoE Password",
+                step3_header: "Step 3: Wi-Fi 6 Wireless Setup",
+                label_smart_connect: "Smart Connect (Single SSID)",
+                desc_smart_connect: "Combines 2.4GHz and 5GHz under a single network name",
+                label_wifi_ssid: "Wi-Fi Network Name (SSID)",
+                label_wifi_pass: "Wi-Fi Password (Minimum 8 characters)",
+                step4_header: "Step 4: Confirm Settings",
+                step4_desc: "Review the parameters below before saving and applying.",
+                msg_saved_success: "✓ Settings saved and applied successfully!",
+                btn_prev: "Previous",
+                btn_next: "Next",
+                btn_finish: "Save & Finish",
+                wifi_setup_title: "Wi-Fi 6 Wireless Network Setup",
+                wifi_setup_desc: "Configure unified SSID (Band Steering) or adjust frequencies individually.",
+                label_ssid: "Wi-Fi Network Name (Unified SSID)",
+                label_password: "WPA3 / WPA2 Personal Password",
+                btn_save: "Save Settings",
+                net_sub_internet: "Internet",
+                net_sub_lan: "LAN",
+                net_sub_iptv: "IPTV",
+                net_sub_dhcp: "DHCP Server",
+                net_sub_ddns: "Dynamic DNS",
+                net_sub_routing: "Static Routing",
+                net_internet_title: "WAN Interface Setup",
+                label_vlan_enable: "VLAN Mode",
+                net_lan_title: "Local Area Network (LAN) Setup",
+                label_subnet_mask: "Subnet Mask",
+                label_ipv6_enable: "Enable IPv6 RADVD / DHCPv6",
+                net_iptv_title: "IPTV & Multicast Service",
+                label_igmp_proxy: "IGMP Proxy",
+                label_igmp_snooping: "IGMP Snooping",
+                label_iptv_vlan: "IPTV VLAN ID",
+                label_iptv_port: "Associated IPTV LAN Port",
+                net_dhcp_title: "Local DHCP Server",
+                label_dhcp_server: "Enable DHCP Server",
+                label_start_ip: "Start IP",
+                label_end_ip: "End IP",
+                label_lease_time: "Lease Time (minutes)",
+                net_ddns_title: "Dynamic DNS (DDNS)",
+                label_ddns_provider: "Service Provider",
+                label_ddns_domain: "Domain Name",
+                net_routing_title: "Static Routing Table",
+                btn_add_route: "Add Route",
+                sys_sub_time: "Time Settings",
+                sys_sub_led: "LED Control",
+                sys_sub_diag: "Diagnostics",
+                sys_sub_upgrade: "Firmware Upgrade",
+                sys_sub_backup: "Backup & Restore",
+                sys_sub_reboot: "Reboot Schedule",
+                sys_sub_admin: "Administration",
+                sys_sub_log: "System Log",
+                sys_sub_traffic: "Traffic Monitor",
+                sys_sub_params: "System Parameters",
+                sys_backup_title: "Backup Configuration",
+                sys_backup_desc: "Save a copy of your ONU's current settings to your computer.",
+                btn_backup: "Download Backup",
+                sys_restore_title: "Restore Configuration",
+                sys_restore_desc: "Restore settings from a previously saved backup file (.bin or .cfg).",
+                btn_restore: "Upload File",
+                sys_factory_title: "Factory Default",
+                sys_factory_desc: "Warning: This action will erase all settings and return the ONU to its original factory state.",
+                btn_factory_reset: "Restore Factory Defaults",
+                footer_copyright: "© 2026 STAVIX Technology. All rights reserved."
+            }
+        };
+
+        let currentLang = 'pt';
+        let currentStep = 1;
+        let currentUserRole = null; 
+
+        function handleLogin(event) {
+            event.preventDefault();
+            const user = document.getElementById('login-username').value.trim();
+            const pass = document.getElementById('login-password').value.trim();
+            const errorBox = document.getElementById('login-error');
+
+            if (user === 'admin' && pass === 'admin') {
+                applyRoleAccess('basic');
+                hideLoginScreen();
+            } else if (user === 'root' && pass === 'root') {
+                applyRoleAccess('advanced');
+                hideLoginScreen();
+            } else {
+                errorBox.classList.remove('hidden');
+            }
+        }
+
+        function hideLoginScreen() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('login-error').classList.add('hidden');
+            document.getElementById('login-form').reset();
+        }
+
+        function handleLogout() {
+            currentUserRole = null;
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.querySelector('[data-page="status"]').click();
+        }
+
+        function applyRoleAccess(role) {
+            currentUserRole = role;
+            const advElements = document.querySelectorAll('[data-role="advanced"]');
+            const badge = document.getElementById('user-badge');
+
+            if (role === 'basic') {
+                advElements.forEach(el => el.classList.add('hidden'));
+                badge.innerText = "admin (Básico)";
+                badge.className = "bg-amber-100 text-amber-800 border border-amber-300 px-3 py-1 rounded-lg font-bold";
+            } else {
+                advElements.forEach(el => el.classList.remove('hidden'));
+                badge.innerText = "root (Avançado)";
+                badge.className = "bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1 rounded-lg font-bold";
+            }
+        }
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'pt' ? 'en' : 'pt';
+            applyLanguage(currentLang);
+        }
+
+        function applyLanguage(lang) {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[lang] && translations[lang][key]) {
+                    el.innerText = translations[lang][key];
+                }
+            });
+            updateWizardButtons();
+        }
+
+        function switchNetTab(targetId) {
+            const netBtns = document.querySelectorAll('.net-tab-btn');
+            const netContents = document.querySelectorAll('.net-tab-content');
+
+            netBtns.forEach(btn => btn.classList.remove('active'));
+            netContents.forEach(cnt => cnt.classList.remove('active'));
+
+            event.target.classList.add('active');
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) targetEl.classList.add('active');
+        }
+
+        function changeStep(delta) {
+            const newStep = currentStep + delta;
+            
+            if (newStep >= 1 && newStep <= 4) {
+                document.getElementById(`wizard-step-${currentStep}`).classList.remove('active');
+                currentStep = newStep;
+                document.getElementById(`wizard-step-${currentStep}`).classList.add('active');
+                
+                updateWizardIndicators();
+                updateWizardButtons();
+
+                if (currentStep === 4) {
+                    document.getElementById('summary-tz').innerText = document.getElementById('qs-timezone').value;
+                    document.getElementById('summary-wan').innerText = document.getElementById('qs-wan-type').value.toUpperCase();
+                    document.getElementById('summary-vlan').innerText = document.getElementById('qs-vlan').value || 'N/A';
+                    document.getElementById('summary-ssid').innerText = document.getElementById('qs-wifi-ssid').value;
+                }
+            } else if (newStep === 5) {
+                document.getElementById('finish-message').classList.remove('hidden');
+            }
+        }
+
+        function updateWizardIndicators() {
+            for (let i = 1; i <= 4; i++) {
+                const ind = document.getElementById(`step-indicator-${i}`);
+                if (i <= currentStep) {
+                    ind.className = "flex items-center gap-2 text-brand-dark";
+                    ind.querySelector('span:first-child').className = "w-7 h-7 rounded-full bg-brand-light border-2 border-brand-dark flex items-center justify-center";
+                } else {
+                    ind.className = "flex items-center gap-2 text-gray-400";
+                    ind.querySelector('span:first-child').className = "w-7 h-7 rounded-full bg-slate-100 border-2 border-slate-300 flex items-center justify-center";
+                }
+            }
+        }
+
+        function updateWizardButtons() {
+            const btnPrev = document.getElementById('btn-prev');
+            const btnNext = document.getElementById('btn-next');
+
+            if (currentStep === 1) {
+                btnPrev.classList.add('hidden');
+            } else {
+                btnPrev.classList.remove('hidden');
+            }
+
+            if (currentStep === 4) {
+                btnNext.innerText = translations[currentLang].btn_finish;
+            } else {
+                btnNext.innerText = translations[currentLang].btn_next;
+            }
+        }
+
+        function toggleWanFields() {
+            const type = document.getElementById('qs-wan-type').value;
+            const pppoeFields = document.getElementById('pppoe-fields');
+            pppoeFields.style.display = type === 'pppoe' ? 'block' : 'none';
+        }
+
+        function switchSysTab(targetId) {
+            const sysBtns = document.querySelectorAll('.sys-tab-btn');
+            const sysContents = document.querySelectorAll('.sys-tab-content');
+
+            sysBtns.forEach(btn => {
+                btn.classList.remove('active', 'bg-brand-dark', 'text-white');
+                btn.classList.add('text-gray-600');
+            });
+            sysContents.forEach(cnt => cnt.classList.remove('active'));
+
+            event.currentTarget.classList.remove('text-gray-600');
+            event.currentTarget.classList.add('active', 'bg-brand-dark', 'text-white');
+            
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) targetEl.classList.add('active');
+        }
+
+        function triggerBackup() {
+            alert(currentLang === 'pt' ? 
+                "A iniciar download do ficheiro 'config_stavix_2026.bin'..." : 
+                "Starting download of file 'config_stavix_2026.bin'...");
+        }
+
+        function triggerRestore() {
+            const fileInput = document.getElementById('restore-file');
+            if (fileInput.files.length === 0) {
+                alert(currentLang === 'pt' ? "Por favor, selecione um ficheiro .bin primeiro." : "Please select a .bin file first.");
+                return;
+            }
+            alert(currentLang === 'pt' ? 
+                "Ficheiro carregado! A restaurar configurações e a reiniciar a ONU..." : 
+                "File uploaded! Restoring configurations and rebooting the ONU...");
+        }
+
+        function triggerFactoryReset() {
+            const confirmMsg = currentLang === 'pt' ? 
+                "TEM A CERTEZA? Esta ação irá apagar todas as configurações e a ONU voltará ao padrão de fábrica." : 
+                "ARE YOU SURE? This action will erase all configurations and the ONU will return to factory defaults.";
+            
+            if(confirm(confirmMsg)) {
+                alert(currentLang === 'pt' ? "A repor padrões de fábrica. Por favor aguarde..." : "Restoring factory defaults. Please wait...");
+            }
+        }
+
+        const sidebarItems = document.querySelectorAll('.sidebar-item');
+        const contentPages = document.querySelectorAll('.content-page');
+
+        sidebarItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const pageId = item.dataset.page;
+
+                sidebarItems.forEach(i => i.classList.remove('active'));
+                contentPages.forEach(p => p.classList.remove('active'));
+
+                item.classList.add('active');
+                document.getElementById(`page-${pageId}`)?.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>
